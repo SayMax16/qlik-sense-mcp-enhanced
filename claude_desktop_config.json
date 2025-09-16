@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "qlik-sense": {
+      "command": "python",
+      "args": ["-m", "qlik_sense_mcp_server.server"],
+      "cwd": "/Users/saydulloismatov/Desktop/qlik-sense-mcp",
+      "env": {
+        "PATH": "/Users/saydulloismatov/Desktop/qlik-sense-mcp/venv/bin:/usr/local/bin:/usr/bin:/bin"
+      }
+    }
+  }
+}

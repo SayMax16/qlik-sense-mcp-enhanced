@@ -344,6 +344,17 @@ class QlikSenseMCPServer:
                         },
                         "required": ["app_id", "object_id"]
                     }
+                ),
+                Tool(
+                    name="get_app_measures",
+                    description="Get master measures from Qlik Sense application with details like name, expression, description, and format",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "app_id": {"type": "string", "description": "Application GUID"}
+                        },
+                        "required": ["app_id"]
+                    }
                 )
                 ]
             return tools_list
@@ -1338,6 +1349,38 @@ class QlikSenseMCPServer:
                         )
                     ]
 
+                elif name == "get_app_measures":
+                    app_id = arguments["app_id"]
+
+                    def _get_app_measures():
+                        try:
+                            self.engine_api.connect()
+                            app_result = self.engine_api.open_doc(app_id, no_data=False)
+                            app_handle = app_result.get("qReturn", {}).get("qHandle", -1)
+
+                            if app_handle == -1:
+                                return {"error": "Failed to open application"}
+
+                            measures = self.engine_api.get_measures(app_handle)
+                            return {
+                                "app_id": app_id,
+                                "master_measures": measures,
+                                "count": len(measures)
+                            }
+
+                        except Exception as e:
+                            return {"error": str(e)}
+                        finally:
+                            self.engine_api.disconnect()
+
+                    result = await asyncio.to_thread(_get_app_measures)
+                    return [
+                        TextContent(
+                            type="text",
+                            text=json.dumps(result, indent=2, ensure_ascii=False)
+                        )
+                    ]
+
                 else:
                     return [TextContent(type="text", text=json.dumps({"error": f"Unknown tool: {name}"}, indent=2, ensure_ascii=False))]
 
@@ -1453,9 +1496,9 @@ EXAMPLES:
 
 AVAILABLE TOOLS:
     Repository API: get_apps, get_app_details
-    Engine API: get_app_sheets, get_app_sheet_objects, get_app_script, get_app_field, get_app_variables, get_app_field_statistics, engine_create_hypercube, get_app_object
+    Engine API: get_app_sheets, get_app_sheet_objects, get_app_script, get_app_field, get_app_variables, get_app_field_statistics, engine_create_hypercube, get_app_object, get_app_measures
 
-    Total: 10 tools for Qlik Sense analytics operations
+    Total: 11 tools for Qlik Sense analytics operations
 
 MORE INFO:
     GitHub: https://github.com/bintocher/qlik-sense-mcp
