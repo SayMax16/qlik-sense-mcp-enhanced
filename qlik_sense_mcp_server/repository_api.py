@@ -95,7 +95,8 @@ class QlikRepositoryAPI:
                                    offset: int = 0,
                                    name: Optional[str] = None,
                                    stream: Optional[str] = None,
-                                   published: Optional[bool] = True) -> Dict[str, Any]:
+                                   published: Optional[bool] = True,
+                                   exclude_streams: Optional[List[str]] = None) -> Dict[str, Any]:
         """
         Get minimal list of apps with essential fields and proper filtering/pagination.
 
@@ -161,6 +162,10 @@ class QlikRepositoryAPI:
         if stream:
             lowered_stream = stream.lower().replace('*', '')
             minimal_apps = [a for a in minimal_apps if lowered_stream in (a.get("stream", "").lower())]
+        if exclude_streams:
+            # Convert exclude list to lowercase for case-insensitive comparison
+            excluded_lower = [s.lower() for s in exclude_streams]
+            minimal_apps = [a for a in minimal_apps if a.get("stream", "").lower() not in excluded_lower]
         if published is not None:
             if published:
                 minimal_apps = [a for a in minimal_apps if a.get("stream", "") != ""]

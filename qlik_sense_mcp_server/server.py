@@ -248,6 +248,11 @@ class QlikSenseMCPServer:
                                 "type": "string",
                                 "description": "Wildcard case-insensitive search in stream name"
                             },
+                            "exclude_streams": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "List of stream names to exclude from results (e.g., ['work', 'test'])"
+                            },
                             "published": {
                                 "type": "string",
                                 "description": "Filter by published status (true/false or 1/0). Default: true",
@@ -355,6 +360,26 @@ class QlikSenseMCPServer:
                         },
                         "required": ["app_id"]
                     }
+                ),
+                Tool(
+                    name="get_streams",
+                    description="Get list of available streams in Qlik Sense with details like name, description, and app count",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": False
+                    }
+                ),
+                Tool(
+                    name="get_app_dimensions",
+                    description="Get master dimensions from Qlik Sense application with details like name, field, description, and labels",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "app_id": {"type": "string", "description": "Application GUID"}
+                        },
+                        "required": ["app_id"]
+                    }
                 )
                 ]
             return tools_list
@@ -393,6 +418,7 @@ class QlikSenseMCPServer:
                     offset = arguments.get("offset", 0)
                     name_filter = arguments.get("name")
                     stream_filter = arguments.get("stream")
+                    exclude_streams = arguments.get("exclude_streams", [])
                     published_arg = arguments.get("published", True)
 
                     if limit is None or limit < 1:
@@ -420,6 +446,7 @@ class QlikSenseMCPServer:
                         name_filter,
                         stream_filter,
                         published_bool,
+                        exclude_streams,
                     )
                     return [
                         TextContent(
@@ -1381,6 +1408,57 @@ class QlikSenseMCPServer:
                         )
                     ]
 
+                elif name == "get_streams":
+                    def _get_streams():
+                        try:
+                            streams = self.repository_api.get_streams()
+                            return {
+                                "streams": streams,
+                                "count": len(streams)
+                            }
+                        except Exception as e:
+                            return {"error": str(e)}
+
+                    result = await asyncio.to_thread(_get_streams)
+                    return [
+                        TextContent(
+                            type="text",
+                            text=json.dumps(result, indent=2, ensure_ascii=False)
+                        )
+                    ]
+
+                elif name == "get_app_dimensions":
+                    app_id = arguments["app_id"]
+
+                    def _get_app_dimensions():
+                        try:
+                            self.engine_api.connect()
+                            app_result = self.engine_api.open_doc(app_id, no_data=False)
+                            app_handle = app_result.get("qReturn", {}).get("qHandle", -1)
+
+                            if app_handle == -1:
+                                return {"error": "Failed to open application"}
+
+                            dimensions = self.engine_api.get_dimensions(app_handle)
+                            return {
+                                "app_id": app_id,
+                                "master_dimensions": dimensions,
+                                "count": len(dimensions)
+                            }
+
+                        except Exception as e:
+                            return {"error": str(e)}
+                        finally:
+                            self.engine_api.disconnect()
+
+                    result = await asyncio.to_thread(_get_app_dimensions)
+                    return [
+                        TextContent(
+                            type="text",
+                            text=json.dumps(result, indent=2, ensure_ascii=False)
+                        )
+                    ]
+
                 else:
                     return [TextContent(type="text", text=json.dumps({"error": f"Unknown tool: {name}"}, indent=2, ensure_ascii=False))]
 
@@ -1495,10 +1573,10 @@ EXAMPLES:
     qlik-sense-mcp-server
 
 AVAILABLE TOOLS:
-    Repository API: get_apps, get_app_details
-    Engine API: get_app_sheets, get_app_sheet_objects, get_app_script, get_app_field, get_app_variables, get_app_field_statistics, engine_create_hypercube, get_app_object, get_app_measures
+    Repository API: get_apps, get_app_details, get_streams
+    Engine API: get_app_sheets, get_app_sheet_objects, get_app_script, get_app_field, get_app_variables, get_app_field_statistics, engine_create_hypercube, get_app_object, get_app_measures, get_app_dimensions
 
-    Total: 11 tools for Qlik Sense analytics operations
+    Total: 13 tools for Qlik Sense analytics operations
 
 MORE INFO:
     GitHub: https://github.com/bintocher/qlik-sense-mcp
